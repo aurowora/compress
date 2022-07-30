@@ -10,7 +10,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import "github.com/gin-gonic/gin"
 
-// Compress creates the Compress middleware with the default options
+// Compress creates the Compress middleware with the provided options
 func Compress(opts ...CompressOption) gin.HandlerFunc {
 	co := newCompressOptions()
 
