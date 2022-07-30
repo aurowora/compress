@@ -41,7 +41,7 @@ to the middleware's constructors, like so:
 
 ```go
 // disables Brotli
-r.Use(compress.WithAlgo(compress.BROTLI, false))
+r.Use(compress.Compress(compress.WithAlgo(compress.BROTLI, false)))
 ```
 
 #### Configuration
