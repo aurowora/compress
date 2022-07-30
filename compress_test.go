@@ -1,0 +1,216 @@
+package compress_test
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/compress/zlib"
+	"github.com/klauspost/compress/zstd"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/aurowora/compress"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+)
+
+/*
+gin-compress Copyright (C) 2022 Aurora McGinnis
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+*/
+
+var smallBody = "SMALL BODY"
+var largeBody = strings.Repeat("LARGE BODY", 256)
+
+func setupRouter(opts ...compress.CompressOption) *gin.Engine {
+	r := gin.Default()
+	r.Use(compress.Compress(opts...))
+
+	r.GET("/small", func(c *gin.Context) {
+		c.String(200, smallBody)
+	})
+	r.GET("/large", func(c *gin.Context) {
+		c.String(200, largeBody)
+	})
+	r.POST("/echo", func(c *gin.Context) {
+		c.Header("X-Request-Content-Encoding", c.GetHeader("Content-Encoding"))
+		c.Header("X-Request-Content-Length", c.GetHeader("Content-Length"))
+
+		b := bytes.NewBuffer(nil)
+		if _, err := io.Copy(b, c.Request.Body); err != nil {
+			panic(err)
+		}
+
+		c.Data(200, "text/plain", b.Bytes())
+	})
+
+	return r
+}
+
+func checkNoop(t *testing.T, w *httptest.ResponseRecorder) {
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, "", w.Header().Get("Content-Encoding"))
+	assert.Equal(t, "", w.Header().Get("Vary"))
+	assert.Equal(t, fmt.Sprintf("%d", w.Body.Len()), w.Header().Get("Content-Length"))
+}
+
+func checkCompress(t *testing.T, w *httptest.ResponseRecorder, expectedAlgo string) {
+	assert.Equal(t, w.Code, 200)
+	assert.Equal(t, expectedAlgo, w.Header().Get("Content-Encoding"))
+	assert.Equal(t, "Accept-Encoding", w.Header().Get("Vary"))
+}
+
+func TestCompressNoopSmall(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/small", nil)
+	req.Header.Add("Accept-Encoding", "gzip, zstd, br")
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkNoop(t, w)
+
+	assert.Equal(t, w.Body.String(), smallBody)
+}
+
+func TestCompressNoopNoneAcceptable(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkNoop(t, w)
+
+	assert.Equal(t, w.Body.String(), largeBody)
+}
+
+func TestCompressNoopNoneAcceptable2(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Set("Accept-Encoding", "doesnotexist")
+
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkNoop(t, w)
+
+	assert.Equal(t, w.Body.String(), largeBody)
+}
+
+func TestCompressGzip(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Add("Accept-Encoding", "gzip")
+	r := setupRouter(compress.WithCompressLevel("gzip", compress.GzFlateBestCompression))
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkCompress(t, w, "gzip")
+
+	gz, err := gzip.NewReader(w.Body)
+	assert.NoError(t, err)
+	defer gz.Close()
+
+	b := bytes.NewBuffer(nil)
+	_, err = gz.WriteTo(b)
+	assert.NoError(t, err)
+	assert.Equal(t, b.String(), largeBody)
+	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
+}
+
+func TestCompressBrotli(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Add("Accept-Encoding", "br")
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkCompress(t, w, "br")
+
+	br := brotli.NewReader(w.Body)
+
+	b := bytes.NewBuffer(nil)
+	if _, err := io.Copy(b, br); err != nil {
+		t.Errorf("Decompression failed: %v\n", err)
+	}
+
+	assert.Equal(t, b.String(), largeBody)
+	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
+}
+
+func TestCompressZstd(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Add("Accept-Encoding", "zstd")
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkCompress(t, w, "zstd")
+
+	z, err := zstd.NewReader(w.Body)
+	assert.NoError(t, err)
+	defer z.Close()
+
+	b := bytes.NewBuffer(nil)
+	if _, err := io.Copy(b, z); err != nil {
+		t.Errorf("Decompression failed: %v\n", err)
+	}
+
+	assert.Equal(t, b.String(), largeBody)
+	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
+}
+
+func TestCompressDeflate(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Add("Accept-Encoding", "deflate")
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkCompress(t, w, "deflate")
+
+	z, err := zlib.NewReader(w.Body)
+	assert.NoError(t, err)
+	defer z.Close()
+
+	b := bytes.NewBuffer(nil)
+	if _, err := io.Copy(b, z); err != nil {
+		t.Errorf("Decompression failed: %v\n", err)
+	}
+
+	assert.Equal(t, b.String(), largeBody)
+	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
+}
+
+func TestQ(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/large", nil)
+	req.Header.Add("Accept-Encoding", "br;q=0.5, gzip;q=0.7, deflate;q=0.3")
+	r := setupRouter()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	checkCompress(t, w, "gzip")
+
+	gz, err := gzip.NewReader(w.Body)
+	assert.NoError(t, err)
+	defer gz.Close()
+
+	b := bytes.NewBuffer(nil)
+	_, err = gz.WriteTo(b)
+	assert.NoError(t, err)
+	assert.Equal(t, b.String(), largeBody)
+	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
+}
