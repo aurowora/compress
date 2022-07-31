@@ -50,13 +50,13 @@ func (cm *compressMiddleware) Handler(c *gin.Context) {
 	c.Writer = rw
 	c.Next()
 
-	_ = rw.Close()
-
 	if rw.Swapped() {
-		c.Header("Vary", "Accept-Encoding")
-		c.Header("Content-Encoding", algo)
+		rw.ResponseWriter.Header().Set("Content-Encoding", algo)
+		rw.ResponseWriter.Header().Set("Vary", "Accept-Encoding")
 	}
+
 	c.Header("Content-Length", fmt.Sprintf("%v", c.Writer.Size()))
+	_ = rw.Close()
 }
 
 // decompresses the request body, if one exists and Content-Encoding is specified
