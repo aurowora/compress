@@ -2,7 +2,6 @@ package compress_test
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zlib"
@@ -41,7 +40,6 @@ func setupRouter(opts ...compress.CompressOption) *gin.Engine {
 	})
 	r.POST("/echo", func(c *gin.Context) {
 		c.Header("X-Request-Content-Encoding", c.GetHeader("Content-Encoding"))
-		c.Header("X-Request-Content-Length", c.GetHeader("Content-Length"))
 
 		b := bytes.NewBuffer(nil)
 		if _, err := io.Copy(b, c.Request.Body); err != nil {
@@ -58,7 +56,6 @@ func checkNoop(t *testing.T, w *httptest.ResponseRecorder) {
 	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, "", w.Header().Get("Content-Encoding"))
 	assert.Equal(t, "", w.Header().Get("Vary"))
-	assert.Equal(t, fmt.Sprintf("%d", w.Body.Len()), w.Header().Get("Content-Length"))
 }
 
 func checkCompress(t *testing.T, w *httptest.ResponseRecorder, expectedAlgo string) {
@@ -124,7 +121,6 @@ func TestCompressGzip(t *testing.T) {
 	_, err = gz.WriteTo(b)
 	assert.NoError(t, err)
 	assert.Equal(t, b.String(), largeBody)
-	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
 }
 
 func TestCompressBrotli(t *testing.T) {
@@ -145,7 +141,6 @@ func TestCompressBrotli(t *testing.T) {
 	}
 
 	assert.Equal(t, b.String(), largeBody)
-	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
 }
 
 func TestCompressZstd(t *testing.T) {
@@ -168,7 +163,6 @@ func TestCompressZstd(t *testing.T) {
 	}
 
 	assert.Equal(t, b.String(), largeBody)
-	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
 }
 
 func TestCompressDeflate(t *testing.T) {
@@ -191,7 +185,6 @@ func TestCompressDeflate(t *testing.T) {
 	}
 
 	assert.Equal(t, b.String(), largeBody)
-	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
 }
 
 func TestQ(t *testing.T) {
@@ -212,5 +205,4 @@ func TestQ(t *testing.T) {
 	_, err = gz.WriteTo(b)
 	assert.NoError(t, err)
 	assert.Equal(t, b.String(), largeBody)
-	assert.Equal(t, fmt.Sprintf("%d", len(largeBody)), w.Header().Get("Content-Length"))
 }

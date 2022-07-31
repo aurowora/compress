@@ -9,7 +9,6 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 
 import (
-	"fmt"
 	"io"
 	"sort"
 	"strconv"
@@ -42,7 +41,6 @@ func (cm *compressMiddleware) Handler(c *gin.Context) {
 
 	if algo == "" || !cm.shouldCompress(c) {
 		c.Next()
-		c.Header("Content-Length", fmt.Sprintf("%v", c.Writer.Size()))
 		return
 	}
 
@@ -55,7 +53,6 @@ func (cm *compressMiddleware) Handler(c *gin.Context) {
 		rw.ResponseWriter.Header().Set("Vary", "Accept-Encoding")
 	}
 
-	c.Header("Content-Length", fmt.Sprintf("%v", c.Writer.Size()))
 	_ = rw.Close()
 }
 
