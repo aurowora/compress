@@ -44,7 +44,7 @@ func (rw *respWriter) WriteString(s string) (int, error) {
 func (rw *respWriter) Write(b []byte) (int, error) {
 	rw.Header().Del("Content-Length")
 
-	if (rw.buf.Len()+len(b) >= rw.threshold) && !rw.Swapped() {
+	if !rw.Swapped() && rw.buf.Len()+len(b) >= rw.threshold {
 		rw.compressor = rw.algo.getWriter(rw.ResponseWriter)
 		if copied, err := io.Copy(rw.compressor, rw.buf); err != nil {
 			return int(copied), err
