@@ -16,17 +16,20 @@ config to your Gin router like so:
 ```go
 package main
 
-import "log"
-import "github.com/gin-gonic/gin" 
-import "github.com/gin-contrib/size"
-import "github.com/aurowora/compress"
+
+import (
+	"log"
+	"github.com/gin-gonic/gin"
+	limits "github.com/gin-contrib/size"
+	"github.com/aurowora/compress"
+)
 
 func main() {
 	r := gin.Default()
 	r.Use(compress.Compress())
 	// Limit payload to 10 MB, notice how it follows Compress() MW.
 	// See the "Security" section below...
-	r.Use(size.RequestSizeLimiter(10 * 1024 * 1024)) 
+	r.Use(limits.RequestSizeLimiter(10 * 1024 * 1024)) 
 	
 	// Declare routes and do whatever else here...
 	
