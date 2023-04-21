@@ -20,16 +20,18 @@ import (
 type respWriter struct {
 	gin.ResponseWriter
 	threshold    int
+	encoding     string
 	algo         algorithm
 	buf          *bytes.Buffer
 	bytesWritten int
 	compressor   io.WriteCloser
 }
 
-func newResponseWriter(c *gin.Context, swapSize int, algo algorithm) *respWriter {
+func newResponseWriter(c *gin.Context, swapSize int, encoding string, algo algorithm) *respWriter {
 	return &respWriter{
 		c.Writer,
 		swapSize,
+		encoding,
 		algo,
 		bytes.NewBuffer(nil),
 		0,
@@ -45,6 +47,8 @@ func (rw *respWriter) Write(b []byte) (int, error) {
 	rw.Header().Del("Content-Length")
 
 	if !rw.Swapped() && rw.buf.Len()+len(b) >= rw.threshold {
+		rw.ResponseWriter.Header().Set("Content-Encoding", rw.encoding)
+		rw.ResponseWriter.Header().Set("Vary", "Accept-Encoding")
 		rw.compressor = rw.algo.getWriter(rw.ResponseWriter)
 		if copied, err := io.Copy(rw.compressor, rw.buf); err != nil {
 			return int(copied), err
