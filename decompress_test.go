@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/andybalholm/brotli"
-	"github.com/aurowora/compress"
+	compress "github.com/lf4096/gin-compress"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zlib"
 	"github.com/klauspost/compress/zstd"

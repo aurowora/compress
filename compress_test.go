@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aurowora/compress"
+	compress "github.com/lf4096/gin-compress"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
