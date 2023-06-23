@@ -44,14 +44,9 @@ func (cm *compressMiddleware) Handler(c *gin.Context) {
 		return
 	}
 
-	rw := newResponseWriter(c, cm.cfg.minCompressBytes, algorithms[algo])
+	rw := newResponseWriter(c, cm.cfg.minCompressBytes, algo, algorithms[algo])
 	c.Writer = rw
 	c.Next()
-
-	if rw.Swapped() {
-		rw.ResponseWriter.Header().Set("Content-Encoding", algo)
-		rw.ResponseWriter.Header().Set("Vary", "Accept-Encoding")
-	}
 
 	_ = rw.Close()
 }
