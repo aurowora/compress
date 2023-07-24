@@ -1,4 +1,4 @@
-module github.com/lf4096/gin-compress
+module github.com/aurowora/compress
 
 go 1.16
 
